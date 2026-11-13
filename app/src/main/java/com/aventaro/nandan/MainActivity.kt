@@ -12,6 +12,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -26,6 +28,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
 import java.text.DateFormat
 import java.util.Date
 
@@ -36,7 +40,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        setContent { NandanTabletApp(this) }
+        setContent { NandanLaunchFlow(this) }
     }
 }
 
@@ -83,7 +87,7 @@ private fun NandanTabletApp(context: Context) {
                             color = MaterialTheme.colorScheme.primaryContainer,
                             shape = MaterialTheme.shapes.large
                         ) {
-                            Text("N", modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("ॐ", modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                         Text("NANDAN", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
                     }
@@ -121,7 +125,7 @@ private fun NandanTabletApp(context: Context) {
                             Text("Nandan", style = MaterialTheme.typography.headlineMedium)
                             Text("PERSONAL AI WORKSPACE  /  TABLET EDITION", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
                         }
-                        AssistChip(onClick = {}, label = { Text("On-device workspace") })
+                        VoiceCommandButton(onCommand = { spoken ->\n                            scope.launch {\n                                val command = spoken.trim()\n                                val lower = command.lowercase()\n                                when {\n                                    lower.startsWith("add task ") || lower.startsWith("create task ") -> {\n                                        val title = command.substringAfter("task", "").trim()\n                                        if (title.isNotBlank()) { dao.addTask(TaskEntity(title = title)); refresh(); info = "Task added: $title" }\n                                    }\n                                    lower.startsWith("remember ") || lower.startsWith("save memory ") -> {\n                                        val content = if (lower.startsWith("remember ")) command.substringAfter("remember").trim() else command.substringAfter("save memory").trim()\n                                        if (content.isNotBlank()) { dao.addMemory(MemoryEntity(title = "Voice memory", content = content)); refresh(); info = "Memory saved." }\n                                    }\n                                    Regex("remind me in (\\\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).matches(command) -> {\n                                        val match = Regex("remind me in (\\\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).find(command)!!\n                                        val minutes = match.groupValues[1].toLong()\n                                        val title = match.groupValues[3].trim()\n                                        val at = System.currentTimeMillis() + minutes * 60_000L\n                                        val id = dao.addReminder(ReminderEntity(title = title, triggerAt = at))\n                                        scheduleReminder(context, id, title, "", at); refresh(); info = "Reminder set for $minutes minutes: $title"\n                                    }\n                                    lower.contains("open tasks") || lower.contains("show tasks") -> { selected = Workspace.TASKS; info = "Opening tasks." }\n                                    lower.contains("open memory") || lower.contains("show memories") -> { selected = Workspace.MEMORY; info = "Opening memory." }\n                                    lower.contains("open reminders") || lower.contains("show reminders") -> { selected = Workspace.REMINDERS; info = "Opening reminders." }\n                                    lower.contains("open overview") || lower.contains("go home") -> { selected = Workspace.ASSISTANT; info = "Opening overview." }\n                                    else -> info = "I heard: \\$command. Try: add task…, remember…, remind me in 5 minutes to…, or open tasks."\n                                }\n                            }\n                        }, onStatus = { info = it })
                     }
                     Text(info, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 14.dp, bottom = 18.dp))
                     when (selected) {
