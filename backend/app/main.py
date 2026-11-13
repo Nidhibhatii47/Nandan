@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import sqlite3
-from contextlib import contextmanager
+import sys
+from contextlib import contextmanager, suppress
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, Literal
 from uuid import uuid4
@@ -11,7 +14,7 @@ from uuid import uuid4
 import httpx
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,12 +25,14 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:3b"
     ollama_timeout_seconds: float = 120.0
     database_path: str = "data/nandan.db"
+    reminder_poll_seconds: float = 5.0
+    reminder_retry_seconds: float = 60.0
 
 
 settings = Settings()
 app = FastAPI(
     title="Nandan API",
-    version="0.3.0",
+    version="0.4.0",
     description="Local-first personal AI operating system API.",
 )
 app.add_middleware(
@@ -79,11 +84,119 @@ def initialize_database() -> None:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS reminders (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                note TEXT NOT NULL DEFAULT '',
+                scheduled_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'scheduled'
+                    CHECK(status IN ('scheduled', 'due', 'acknowledged')),
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                acknowledged_at TEXT,
+                notified_at TEXT,
+                last_notification_attempt_at TEXT,
+                notification_attempts INTEGER NOT NULL DEFAULT 0,
+                notification_error TEXT
+            )
+        """)
+        # Additive migration for databases created by earlier Milestone 4 builds.
+        reminder_columns = {
+            row["name"] for row in db.execute("PRAGMA table_info(reminders)").fetchall()
+        }
+        migrations = {
+            "notified_at": "TEXT",
+            "last_notification_attempt_at": "TEXT",
+            "notification_attempts": "INTEGER NOT NULL DEFAULT 0",
+            "notification_error": "TEXT",
+        }
+        for column, declaration in migrations.items():
+            if column not in reminder_columns:
+                db.execute(f"ALTER TABLE reminders ADD COLUMN {column} {declaration}")
+        db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reminders_status_time "
+            "ON reminders(status, scheduled_at)"
+        )
+
+
+def send_native_notification(title: str, note: str) -> bool:
+    """Send a Windows toast. Returns False when native delivery is unavailable."""
+    if sys.platform != "win32":
+        return False
+    try:
+        from winotify import Notification
+        toast = Notification(
+            app_id="Nandan",
+            title=title,
+            msg=note or "Your reminder is due.",
+            duration="long",
+        )
+        toast.show()
+        return True
+    except Exception as exc:
+        raise RuntimeError(f"Windows notification failed: {exc}") from exc
+
+
+def deliver_due_notifications(now: datetime | None = None) -> int:
+    """Deliver due reminders once; retry failed attempts with a bounded cadence."""
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        raise ValueError("Reminder notification delivery requires a timezone-aware timestamp.")
+    current = current.astimezone(timezone.utc)
+    retry_before = (current - timedelta(seconds=max(10.0, settings.reminder_retry_seconds))).isoformat()
+    with connect_db() as db:
+        rows = db.execute(
+            "SELECT id, title, note FROM reminders WHERE status = 'due' "
+            "AND notified_at IS NULL AND (last_notification_attempt_at IS NULL "
+            "OR last_notification_attempt_at <= ?) ORDER BY scheduled_at ASC",
+            (retry_before,),
+        ).fetchall()
+
+    delivered = 0
+    for row in rows:
+        try:
+            success = send_native_notification(row["title"], row["note"])
+            error = None if success else "Native OS notifications are supported on Windows only."
+        except Exception as exc:
+            success = False
+            error = str(exc)[:500]
+        attempted_at = current.isoformat()
+        with connect_db() as db:
+            db.execute(
+                "UPDATE reminders SET last_notification_attempt_at = ?, "
+                "notification_attempts = notification_attempts + 1, "
+                "notified_at = CASE WHEN ? THEN ? ELSE notified_at END, "
+                "notification_error = ? WHERE id = ? AND status = 'due' AND notified_at IS NULL",
+                (attempted_at, int(success), attempted_at, error, row["id"]),
+            )
+        if success:
+            delivered += 1
+    return delivered
+
+
+async def reminder_worker() -> None:
+    while True:
+        promote_due_reminders()
+        deliver_due_notifications()
+        await asyncio.sleep(max(1.0, settings.reminder_poll_seconds))
 
 
 @app.on_event("startup")
 async def startup() -> None:
     initialize_database()
+    # Recover reminders that became due while the computer or backend was offline.
+    promote_due_reminders()
+    deliver_due_notifications()
+    app.state.reminder_worker = asyncio.create_task(reminder_worker())
+
+
+@app.on_event("shutdown")
+async def shutdown() -> None:
+    worker = getattr(app.state, "reminder_worker", None)
+    if worker:
+        worker.cancel()
+        with suppress(asyncio.CancelledError):
+            await worker
 
 
 class ChatMessage(BaseModel):
@@ -119,11 +232,39 @@ class TaskUpdate(BaseModel):
     completed: bool | None = None
 
 
+class ReminderCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    note: str = Field(default="", max_length=1000)
+    scheduled_at: AwareDatetime
+
+
 def row_dict(row: sqlite3.Row) -> dict:
     item = dict(row)
     if "completed" in item:
         item["completed"] = bool(item["completed"])
     return item
+
+
+def promote_due_reminders(now: datetime | None = None) -> int:
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        raise ValueError("Reminder scheduler requires a timezone-aware timestamp.")
+    with connect_db() as db:
+        rows = db.execute(
+            "SELECT id, scheduled_at FROM reminders WHERE status = 'scheduled'"
+        ).fetchall()
+        due_ids = []
+        for row in rows:
+            scheduled = datetime.fromisoformat(row["scheduled_at"])
+            if scheduled <= current:
+                due_ids.append(row["id"])
+        if not due_ids:
+            return 0
+        db.executemany(
+            "UPDATE reminders SET status = 'due' WHERE id = ? AND status = 'scheduled'",
+            [(item_id,) for item_id in due_ids],
+        )
+        return len(due_ids)
 
 
 _STOP_WORDS = {
@@ -198,12 +339,15 @@ async def health() -> dict[str, str | bool]:
             ollama_ok = response.is_success
     except httpx.HTTPError:
         pass
+    worker = getattr(app.state, "reminder_worker", None)
     return {
         "status": "ok",
         "service": "nandan-api",
         "ollama_connected": ollama_ok,
         "model": settings.ollama_model,
         "storage": "local-sqlite",
+        "reminder_scheduler_running": worker is not None and not worker.done(),
+        "native_notifications": "windows-toast" if sys.platform == "win32" else "unsupported-on-this-platform",
     }
 
 
@@ -308,6 +452,68 @@ async def delete_task(task_id: str) -> Response:
         cursor = db.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
     if cursor.rowcount == 0:
         raise HTTPException(status_code=404, detail="Task not found.")
+    return Response(status_code=204)
+
+
+@app.get("/api/reminders")
+async def list_reminders() -> list[dict]:
+    promote_due_reminders()
+    with connect_db() as db:
+        rows = db.execute(
+            "SELECT * FROM reminders ORDER BY "
+            "CASE status WHEN 'due' THEN 0 WHEN 'scheduled' THEN 1 ELSE 2 END, "
+            "scheduled_at ASC"
+        ).fetchall()
+    return [row_dict(row) for row in rows]
+
+
+@app.get("/api/reminders/due")
+async def due_reminders() -> list[dict]:
+    promote_due_reminders()
+    with connect_db() as db:
+        rows = db.execute(
+            "SELECT * FROM reminders WHERE status = 'due' ORDER BY scheduled_at ASC"
+        ).fetchall()
+    return [row_dict(row) for row in rows]
+
+
+@app.post("/api/reminders", status_code=201)
+async def create_reminder(payload: ReminderCreate) -> dict:
+    reminder_id = str(uuid4())
+    scheduled_at = payload.scheduled_at.astimezone(timezone.utc).isoformat()
+    with connect_db() as db:
+        db.execute(
+            "INSERT INTO reminders (id, title, note, scheduled_at) VALUES (?, ?, ?, ?)",
+            (reminder_id, payload.title.strip(), payload.note.strip(), scheduled_at),
+        )
+        row = db.execute("SELECT * FROM reminders WHERE id = ?", (reminder_id,)).fetchone()
+    promote_due_reminders()
+    with connect_db() as db:
+        row = db.execute("SELECT * FROM reminders WHERE id = ?", (reminder_id,)).fetchone()
+    return row_dict(row)
+
+
+@app.post("/api/reminders/{reminder_id}/acknowledge")
+async def acknowledge_reminder(reminder_id: str) -> dict:
+    acknowledged_at = datetime.now(timezone.utc).isoformat()
+    with connect_db() as db:
+        cursor = db.execute(
+            "UPDATE reminders SET status = 'acknowledged', acknowledged_at = ? "
+            "WHERE id = ? AND status = 'due'",
+            (acknowledged_at, reminder_id),
+        )
+        row = db.execute("SELECT * FROM reminders WHERE id = ?", (reminder_id,)).fetchone()
+    if cursor.rowcount == 0 or row is None:
+        raise HTTPException(status_code=404, detail="Due reminder not found.")
+    return row_dict(row)
+
+
+@app.delete("/api/reminders/{reminder_id}", status_code=204)
+async def delete_reminder(reminder_id: str) -> Response:
+    with connect_db() as db:
+        cursor = db.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Reminder not found.")
     return Response(status_code=204)
 
 

@@ -12,22 +12,29 @@ React + TypeScript (Vite)
         | HTTP on localhost
         v
 FastAPI (127.0.0.1:8000)
-        |
-        | Ollama API (127.0.0.1:11434)
-        v
-Local language model
+        |                    |
+        | Ollama API         | local SQLite
+        v                    v
+Local language model   Memories / tasks / reminders
+                             ^
+                             |
+                  Local asyncio reminder worker
 ```
 
-The browser UI and backend are separate processes. The backend must be running on the desktop for the UI to reach its local Ollama service.
+The browser UI and backend are separate processes. The backend must be running on the desktop for the UI to reach its local Ollama service. The reminder worker runs inside the backend process and promotes due reminders every few seconds. The UI polls the local API and can display browser notifications after explicit permission is granted.
+
+## Implemented modules
+
+1. **Conversation and memory** — explicit memory controls and local keyword-based retrieval.
+2. **Tasks** — local task creation, update, completion and deletion.
+3. **Reminders** — timezone-aware schedules, due-state promotion, acknowledgement and deletion; browser alerts are opt-in.
 
 ## Planned modules
 
-1. **Conversation and memory** — user-owned conversation history, explicit memory controls, retrieval, export and deletion.
-2. **Tasks and reminders** — local task store, schedules, notifications and completion state.
-3. **Agent runtime** — bounded tools, plans, approvals, execution logs and recovery.
-4. **Creator studio** — research, scripts, assets, narration and publishing workflow; publishing requires approval.
-5. **Work assistant** — job discovery, document preparation and follow-up tracking; submitting applications requires approval.
-6. **Device bridge** — authenticated pairing between desktop host and Android client.
+4. **Agent runtime** — bounded tools, plans, approvals, execution logs and recovery.
+5. **Creator studio** — research, scripts, assets, narration and publishing workflow; publishing requires approval.
+6. **Work assistant** — job discovery, document preparation and follow-up tracking; submitting applications requires approval.
+7. **Device bridge** — authenticated pairing between desktop host and Android client.
 
 ## Security principles
 
@@ -40,11 +47,11 @@ The browser UI and backend are separate processes. The backend must be running o
 
 ## Delivery sequence
 
-- M0: repository scaffold, health endpoint, local-model chat (current).
-- M1: local persistence, conversation history, settings and automated tests.
-- M2: task manager and reminders.
-- M3: permissioned tool registry and agent planning.
-- M4: Android companion and secure device pairing.
-- M5: creator/work workflows and controlled integrations.
+- M0: repository scaffold, health endpoint and local-model chat.
+- M1: local persistence and automated tests.
+- M2: memory retrieval and task manager.
+- M3/M4: local reminder scheduler and browser notification surface.
+- Next: permissioned tool registry and agent planning.
+- Later: Android companion, secure pairing and controlled integrations.
 
 Each milestone must be tested before being described as complete.

@@ -3,8 +3,9 @@ import { FormEvent, useEffect, useState } from "react";
 type Message = { role: "user" | "assistant"; content: string };
 type Task = { id: string; title: string; description: string; due_at: string | null; completed: boolean };
 type Memory = { id: string; label: string; content: string; created_at: string };
-type Health = { status: string; ollama_connected: boolean; model: string; storage?: string };
-type Section = "assistant" | "tasks" | "memory";
+type Reminder = { id: string; title: string; note: string; scheduled_at: string; status: "scheduled" | "due" | "acknowledged"; created_at: string; acknowledged_at: string | null };
+type Health = { status: string; ollama_connected: boolean; model: string; storage?: string; reminder_scheduler_running?: boolean; native_notifications?: string };
+type Section = "assistant" | "tasks" | "memory" | "reminders";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -21,10 +22,14 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function localDateTime(value: string): string {
+  return new Date(value).toLocaleString();
+}
+
 export default function App() {
   const [section, setSection] = useState<Section>("assistant");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Welcome to Nandan. Your conversations use the local model when the desktop runtime is connected. Explicitly saved memories are retrieved when relevant. Memory and tasks are stored locally on that computer." },
+    { role: "assistant", content: "Welcome to Nandan. Your conversations use the local model when the desktop runtime is connected. Explicitly saved memories are retrieved when relevant. Memory, tasks and reminders are stored locally on that computer." },
   ]);
   const [input, setInput] = useState("");
   const [health, setHealth] = useState<Health | null>(null);
@@ -32,14 +37,19 @@ export default function App() {
   const [error, setError] = useState("");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
   const [memoryLabel, setMemoryLabel] = useState("");
   const [memoryContent, setMemoryContent] = useState("");
+  const [reminderTitle, setReminderTitle] = useState("");
+  const [reminderNote, setReminderNote] = useState("");
+  const [reminderAt, setReminderAt] = useState("");
   const [loadingData, setLoadingData] = useState(false);
 
   async function refreshTasks() { setTasks(await api<Task[]>("/api/tasks")); }
   async function refreshMemories() { setMemories(await api<Memory[]>("/api/memories")); }
+  async function refreshReminders() { setReminders(await api<Reminder[]>("/api/reminders")); }
 
   useEffect(() => {
     let active = true;
@@ -59,11 +69,30 @@ export default function App() {
   useEffect(() => {
     let active = true;
     setLoadingData(true);
-    const load = section === "tasks" ? refreshTasks : section === "memory" ? refreshMemories : async () => undefined;
+    const load = section === "tasks" ? refreshTasks
+      : section === "memory" ? refreshMemories
+      : section === "reminders" ? refreshReminders
+      : async () => undefined;
     load()
       .catch((err: unknown) => { if (active) setError(err instanceof Error ? err.message : "Could not load local data."); })
       .finally(() => { if (active) setLoadingData(false); });
     return () => { active = false; };
+  }, [section]);
+
+  useEffect(() => {
+    let active = true;
+    const checkDueReminders = async () => {
+      try {
+        const due = await api<Reminder[]>("/api/reminders/due");
+        if (!active) return;
+        if (due.length > 0 || section === "reminders") await refreshReminders();
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : "Reminder check failed.");
+      }
+    };
+    void checkDueReminders();
+    const timer = window.setInterval(() => { void checkDueReminders(); }, 10000);
+    return () => { active = false; window.clearInterval(timer); };
   }, [section]);
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
@@ -127,7 +156,43 @@ export default function App() {
     catch (err) { setError(err instanceof Error ? err.message : "Could not delete memory."); }
   }
 
-  const heading = section === "assistant" ? "Assistant" : section === "tasks" ? "Tasks" : "Memory";
+  async function addReminder(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!reminderTitle.trim() || !reminderAt) return;
+    const scheduled = new Date(reminderAt);
+    if (Number.isNaN(scheduled.getTime()) || scheduled.getTime() <= Date.now()) {
+      setError("Choose a reminder time in the future.");
+      return;
+    }
+    setError("");
+    try {
+      await api<Reminder>("/api/reminders", {
+        method: "POST",
+        body: JSON.stringify({ title: reminderTitle.trim(), note: reminderNote.trim(), scheduled_at: scheduled.toISOString() }),
+      });
+      setReminderTitle("");
+      setReminderNote("");
+      setReminderAt("");
+      await refreshReminders();
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not schedule reminder."); }
+  }
+
+  async function acknowledgeReminder(reminderId: string) {
+    try {
+      await api<Reminder>("/api/reminders/" + reminderId + "/acknowledge", { method: "POST" });
+      await refreshReminders();
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not acknowledge reminder."); }
+  }
+
+  async function deleteReminder(reminderId: string) {
+    try {
+      await api<void>("/api/reminders/" + reminderId, { method: "DELETE" });
+      await refreshReminders();
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not delete reminder."); }
+  }
+
+  const heading = section === "assistant" ? "Assistant" : section === "tasks" ? "Tasks" : section === "memory" ? "Memory" : "Reminders";
+  const dueCount = reminders.filter((item) => item.status === "due").length;
 
   return (
     <main className="shell">
@@ -139,6 +204,7 @@ export default function App() {
         <button className={"nav-item " + (section === "assistant" ? "active" : "")} onClick={() => { setSection("assistant"); setError(""); }}>◉ &nbsp; Assistant</button>
         <button className={"nav-item " + (section === "tasks" ? "active" : "")} onClick={() => { setSection("tasks"); setError(""); }}>▦ &nbsp; Tasks <small>{tasks.length}</small></button>
         <button className={"nav-item " + (section === "memory" ? "active" : "")} onClick={() => { setSection("memory"); setError(""); }}>◈ &nbsp; Memory <small>{memories.length}</small></button>
+        <button className={"nav-item " + (section === "reminders" ? "active" : "")} onClick={() => { setSection("reminders"); setError(""); }}>◷ &nbsp; Reminders <small>{dueCount || reminders.length}</small></button>
         <div className="nav-item muted">✳ &nbsp; Creator studio <small>Planned</small></div>
         <div className="sidebar-bottom"><span className="privacy-dot" /><span>Local-first by design</span></div>
       </aside>
@@ -197,7 +263,36 @@ export default function App() {
             </article>)}</div>}
         </section>}
 
-        <p className="footer-note">Milestone 3 · Local memory retrieval · External actions are not enabled</p>
+        {section === "reminders" && <section className="workspace-content">
+          <p className="section-intro">Reminders are stored locally. On Windows, the background backend sends native system notifications even when this interface is closed. Install the Windows startup task from the repository's scripts folder to start the backend at sign-in.</p>
+          <div className="reminder-toolbar">
+            <span>{health?.reminder_scheduler_running ? "Scheduler running" : "Scheduler not running"}</span>
+            <span>{health?.native_notifications === "windows-toast" ? "Windows notifications supported" : "Native notifications require Windows"}</span>
+          </div>
+          <form className="data-form" onSubmit={addReminder}>
+            <input value={reminderTitle} onChange={(event) => setReminderTitle(event.target.value)} placeholder="Reminder title" maxLength={200} required />
+            <input value={reminderNote} onChange={(event) => setReminderNote(event.target.value)} placeholder="Note (optional)" maxLength={1000} />
+            <label className="date-label">Date and time (your device's local time)
+              <input type="datetime-local" value={reminderAt} onChange={(event) => setReminderAt(event.target.value)} required />
+            </label>
+            <button type="submit" disabled={!reminderTitle.trim() || !reminderAt}>Schedule reminder</button>
+          </form>
+          {loadingData ? <p className="empty-state">Loading reminders…</p> : reminders.length === 0 ? <p className="empty-state">No reminders yet. Schedule your first one above.</p> :
+            <div className="item-list">{reminders.map((reminder) => <article className={"data-item reminder-item " + reminder.status} key={reminder.id}>
+              <div className="reminder-copy">
+                <strong>{reminder.title}</strong>
+                {reminder.note && <p>{reminder.note}</p>}
+                <small>{localDateTime(reminder.scheduled_at)}</small>
+                <span className={"reminder-state " + reminder.status}>{reminder.status === "due" ? "Due now" : reminder.status === "acknowledged" ? "Acknowledged" : "Scheduled"}</span>
+              </div>
+              <div className="reminder-actions">
+                {reminder.status === "due" && <button className="ack-button" onClick={() => void acknowledgeReminder(reminder.id)}>Done</button>}
+                <button className="delete-button" onClick={() => void deleteReminder(reminder.id)}>Delete</button>
+              </div>
+            </article>)}</div>}
+        </section>}
+
+        <p className="footer-note">Milestone 4 · Local reminder scheduler · No cloud service required</p>
       </section>
     </main>
   );
