@@ -4,15 +4,17 @@
 
 Nandan is being built as a desktop-first assistant that can chat with a locally hosted model, retain user-controlled context, manage tasks, and later orchestrate approved workflows across the user's devices.
 
-## Current milestone: foundation
+## Current milestone: local memory and task workspace
 
 - React + TypeScript + Vite user interface
 - FastAPI backend with local SQLite memory and task APIs
 - Ollama local model integration (no hosted AI API required)
+- Relevant saved memories are selected locally by keyword overlap and added to the chat system context (up to four matches)
+- Memories are only stored when the user explicitly saves them; they can be reviewed and deleted
 - Localhost-only backend binding by default
-- Clear extension points for memory, tasks, agents, and creator tools
+- CI workflow for backend syntax, backend tests, and frontend build
 
-This is an early development scaffold, not a production-ready assistant. Persistent memory, task storage, device pairing, permissions, and workflow execution are planned milestones and are not implemented yet.
+This is an early development scaffold, not a production-ready assistant. Memory retrieval is a lightweight lexical baseline, not semantic/embedding search. Device pairing, reminders, permissions, and workflow execution are future milestones.
 
 ## Prerequisites
 
@@ -48,7 +50,7 @@ The API stores user-entered memories and tasks in a local SQLite database at `ba
 - `PATCH /api/tasks/{id}` — update task details or completion
 - `DELETE /api/tasks/{id}` — delete a task
 
-The frontend includes Tasks and Memory workspaces. These records are not automatically inferred from chat yet; users choose what to save.
+The frontend includes Assistant, Tasks, and Memory workspaces. During chat, Nandan ranks saved memories against the current message using local token overlap and includes up to four matching entries. Unrelated memories are omitted. This first retrieval version is intentionally simple and will later be replaced or augmented with local semantic retrieval.
 
 ## Run the frontend
 
@@ -69,6 +71,7 @@ Copy `backend/.env.example` to `backend/.env` and adjust values if needed. The d
 ## Safety and scope
 
 - The backend binds to loopback by default; do not expose it to a public network.
+- Saved memory is user-controlled context, not an instruction override.
 - The assistant does not execute shell commands, control apps, send messages, publish content, or spend money in this milestone.
 - External actions will require explicit permission boundaries and audit logging before implementation.
 - Never commit API keys, passwords, tokens, or personal data.
