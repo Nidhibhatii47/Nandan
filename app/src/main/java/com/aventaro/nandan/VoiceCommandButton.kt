@@ -32,19 +32,15 @@ fun VoiceCommandButton(onCommand: (String) -> Unit, onStatus: (String) -> Unit) 
     var recognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
 
     fun startListening() {
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
-            onStatus("No speech recognition service is installed.")
+        if (Build.VERSION.SDK_INT < 31 || !SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
+            onStatus("Offline speech recognition is unavailable. Install an offline speech language pack on this tablet, then try again.")
             return
         }
-        val speech = if (Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)) {
-            SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-        } else {
-            SpeechRecognizer.createSpeechRecognizer(context)
-        }
+        val speech = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         recognizer?.destroy()
         recognizer = speech
         speech.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: android.os.Bundle?) { listening = true; onStatus("Listening… speak your command.") }
+            override fun onReadyForSpeech(params: android.os.Bundle?) { listening = true; onStatus("Offline listening… speak your command.") }
             override fun onBeginningOfSpeech() { }
             override fun onRmsChanged(rmsdB: Float) { }
             override fun onBufferReceived(buffer: ByteArray?) { }
