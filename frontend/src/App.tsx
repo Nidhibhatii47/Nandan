@@ -1,10 +1,10 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type Message = { role: "user" | "assistant"; content: string };
 type Task = { id: string; title: string; description: string; due_at: string | null; completed: boolean };
 type Memory = { id: string; label: string; content: string; created_at: string };
 type Reminder = { id: string; title: string; note: string; scheduled_at: string; status: "scheduled" | "due" | "acknowledged"; created_at: string; acknowledged_at: string | null };
-type Health = { status: string; ollama_connected: boolean; model: string; storage?: string };
+type Health = { status: string; ollama_connected: boolean; model: string; storage?: string; reminder_scheduler_running?: boolean; native_notifications?: string };
 type Section = "assistant" | "tasks" | "memory" | "reminders";
 
 const API_BASE = "http://127.0.0.1:8000";
@@ -46,10 +46,6 @@ export default function App() {
   const [reminderNote, setReminderNote] = useState("");
   const [reminderAt, setReminderAt] = useState("");
   const [loadingData, setLoadingData] = useState(false);
-  const [desktopAlerts, setDesktopAlerts] = useState(
-    typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted"
-  );
-  const notifiedIds = useRef<Set<string>>(new Set());
 
   async function refreshTasks() { setTasks(await api<Task[]>("/api/tasks")); }
   async function refreshMemories() { setMemories(await api<Memory[]>("/api/memories")); }
@@ -89,16 +85,6 @@ export default function App() {
       try {
         const due = await api<Reminder[]>("/api/reminders/due");
         if (!active) return;
-        for (const reminder of due) {
-          if (notifiedIds.current.has(reminder.id)) continue;
-          notifiedIds.current.add(reminder.id);
-          if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("Nandan reminder", {
-              body: reminder.title + (reminder.note ? " — " + reminder.note : ""),
-              tag: reminder.id,
-            });
-          }
-        }
         if (due.length > 0 || section === "reminders") await refreshReminders();
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : "Reminder check failed.");
@@ -108,16 +94,6 @@ export default function App() {
     const timer = window.setInterval(() => { void checkDueReminders(); }, 10000);
     return () => { active = false; window.clearInterval(timer); };
   }, [section]);
-
-  async function enableDesktopAlerts() {
-    if (!("Notification" in window)) {
-      setError("Desktop notifications are not supported in this browser.");
-      return;
-    }
-    const permission = await Notification.requestPermission();
-    setDesktopAlerts(permission === "granted");
-    if (permission !== "granted") setError("Notification permission was not granted. In-app reminders will still work while Nandan is open.");
-  }
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -204,7 +180,6 @@ export default function App() {
   async function acknowledgeReminder(reminderId: string) {
     try {
       await api<Reminder>("/api/reminders/" + reminderId + "/acknowledge", { method: "POST" });
-      notifiedIds.current.delete(reminderId);
       await refreshReminders();
     } catch (err) { setError(err instanceof Error ? err.message : "Could not acknowledge reminder."); }
   }
@@ -212,7 +187,6 @@ export default function App() {
   async function deleteReminder(reminderId: string) {
     try {
       await api<void>("/api/reminders/" + reminderId, { method: "DELETE" });
-      notifiedIds.current.delete(reminderId);
       await refreshReminders();
     } catch (err) { setError(err instanceof Error ? err.message : "Could not delete reminder."); }
   }
@@ -290,10 +264,10 @@ export default function App() {
         </section>}
 
         {section === "reminders" && <section className="workspace-content">
-          <p className="section-intro">Schedule local reminders. Nandan checks the schedule while its backend is running and sends browser notifications when permission is enabled.</p>
+          <p className="section-intro">Reminders are stored locally. On Windows, the background backend sends native system notifications even when this interface is closed. Install the Windows startup task from the repository's scripts folder to start the backend at sign-in.</p>
           <div className="reminder-toolbar">
-            <span>{desktopAlerts ? "Desktop alerts enabled" : "Desktop alerts not enabled"}</span>
-            <button className="secondary-button" onClick={() => void enableDesktopAlerts()}>{desktopAlerts ? "Refresh permission" : "Enable desktop alerts"}</button>
+            <span>{health?.reminder_scheduler_running ? "Scheduler running" : "Scheduler not running"}</span>
+            <span>{health?.native_notifications === "windows-toast" ? "Windows notifications supported" : "Native notifications require Windows"}</span>
           </div>
           <form className="data-form" onSubmit={addReminder}>
             <input value={reminderTitle} onChange={(event) => setReminderTitle(event.target.value)} placeholder="Reminder title" maxLength={200} required />
