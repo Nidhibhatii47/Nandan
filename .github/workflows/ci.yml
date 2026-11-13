@@ -2,7 +2,7 @@ name: Nandan CI
 
 on:
   push:
-    branches: ["main", "foundation/**"]
+    branches: ["main", "foundation/**", "feature/**"]
   pull_request:
     branches: ["main"]
 
@@ -18,8 +18,16 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
       - name: Validate backend syntax
         run: python -m compileall -q backend/app
+
+      - name: Run backend tests
+        working-directory: backend
+        run: pytest -q
 
       - name: Set up Node
         uses: actions/setup-node@v4
