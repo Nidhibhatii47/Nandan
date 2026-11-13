@@ -95,3 +95,24 @@ button, textarea { font: inherit; }
   font-size: 12px;
   background: var(--surface, #fff);
 }
+
+
+/* Reminder workspace */
+.reminder-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 0 12px; color: #9ba6ba; font-size: 11px; }
+.secondary-button, .ack-button { border: 1px solid #495778; border-radius: 8px; padding: 8px 11px; color: #cbd5ff; background: #20283b; font-size: 10px; cursor: pointer; }
+.date-label { display: grid; gap: 7px; color: #9ba6ba; font-size: 11px; }
+.date-label input { width: 100%; border: 1px solid #343d50; border-radius: 8px; padding: 11px 12px; color: #edf0f7; background: #111722; font: inherit; color-scheme: dark; }
+.reminder-item { align-items: flex-start; }
+.reminder-copy { min-width: 0; flex: 1; }
+.reminder-copy p { margin: 6px 0 0; color: #b9c3d4; font-size: 12px; }
+.reminder-state { display: inline-block; margin-top: 8px; color: #9ba6ba; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.reminder-state.due { color: #f0bc79; }
+.reminder-state.acknowledged { color: #83caa4; }
+.reminder-item.due { border-color: #785c37; background: rgba(61,45,27,.35); }
+.reminder-item.acknowledged { opacity: .68; }
+.reminder-actions { display: flex; flex-shrink: 0; align-items: center; gap: 7px; }
+.ack-button { color: #9fe0bd; border-color: #42624f; background: #1b3028; }
+@media (max-width: 700px) {
+  .reminder-toolbar { align-items: flex-start; flex-direction: column; }
+  .reminder-actions { flex-direction: column; align-items: stretch; }
+}
