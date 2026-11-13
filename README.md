@@ -36,6 +36,8 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 Backend health: http://127.0.0.1:8000/api/health
 
+Run backend tests from the backend directory with `pytest -q`.
+
 ## Local memory and tasks
 
 The API stores user-entered memories and tasks in a local SQLite database at `backend/data/nandan.db` by default. The database is created automatically when the API starts.
