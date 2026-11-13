@@ -10,11 +10,13 @@ Nandan is being built as a desktop-first assistant that can chat with a locally 
 - FastAPI backend with local SQLite memory, task and reminder APIs
 - Ollama local model integration (no hosted AI API required)
 - Relevant saved memories are selected locally by keyword overlap and added to chat context (up to four matches)
-- Reminder scheduler runs in the local backend process and promotes scheduled reminders to due status
-- Browser notifications are optional and require the user's permission
-- CI validates backend syntax, backend tests and frontend production build
+- Reminder scheduler runs in the local backend process, recovers missed reminders after restart, and persists notification delivery state
+- On Windows, the backend sends native Windows toast notifications even when the web interface is closed
+- A Windows Task Scheduler installer can start the backend automatically at user sign-in and restart it after failures
+- Native notification attempts are retried with a bounded interval; successful delivery is recorded to avoid duplicate toasts
+- CI validates backend syntax, reminder recovery/delivery tests and frontend production build
 
-This is an early development scaffold, not a production-ready assistant. Reminder delivery currently requires the local backend to remain running; browser notifications additionally require the UI/browser runtime and permission. OS-level delivery after the browser is closed, device pairing and remote notifications are future work.
+This remains an early development scaffold, not a production-ready assistant. Windows native notifications require Windows 10/11, the Windows-only `winotify` dependency, and the background task to be installed. The computer must be powered on and the user must be signed in. Android native notifications, remote/device-paired reminders, and delivery while the computer is shut down are not included.
 
 ## Prerequisites
 
@@ -54,7 +56,7 @@ SQLite database: `backend/data/nandan.db`.
 - `POST /api/reminders/{id}/acknowledge` — mark a due reminder as acknowledged
 - `DELETE /api/reminders/{id}` — delete a reminder
 
-Reminder timestamps must include a timezone. The UI converts the device's local date/time to UTC before sending it to the backend. The backend scheduler checks every five seconds by default. Change `NANDAN_REMINDER_POLL_SECONDS` only if you add that setting to the environment configuration; otherwise the default is five seconds.
+Reminder timestamps must include a timezone. The UI converts the device's local date/time to UTC before sending it to the backend. The backend scheduler checks every five seconds by default. Failed native notification attempts are retried after 60 seconds by default. Configure `REMINDER_POLL_SECONDS` and `REMINDER_RETRY_SECONDS` in `backend/.env` if needed.
 
 ## Run the frontend
 
@@ -66,7 +68,25 @@ npm install
 npm run dev
 ```
 
-Open the local Vite URL printed in the terminal (normally http://localhost:5173). In the Reminders workspace, grant notification permission to enable browser alerts. In-app due status is shown while the workspace is open.
+Open the local Vite URL printed in the terminal (normally http://localhost:5173). In-app due status is shown while the workspace is open. On Windows, the backend can send native toast notifications independently of the browser UI.
+
+## Windows background reminders
+
+After installing backend dependencies and confirming the backend starts successfully, open PowerShell in the repository root and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install_windows_startup.ps1
+```
+
+This registers and starts a per-user Task Scheduler task named `Nandan Reminder Engine`. It starts the local API at sign-in and writes logs to `backend/logs/reminder-engine.log`. Verify the API at http://127.0.0.1:8000/api/health; the response should report `reminder_scheduler_running: true` and `native_notifications: "windows-toast"`.
+
+To remove automatic startup:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\uninstall_windows_startup.ps1
+```
+
+The task runs under the signed-in Windows user. Windows notification settings must allow notifications for the Python/Windows app. The machine must be on and the user signed in for scheduled reminders to fire.
 
 ## Configuration
 
