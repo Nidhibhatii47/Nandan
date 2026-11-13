@@ -160,8 +160,8 @@ private fun NandanTabletApp(context: Context) {
                                         val content = if (lower.startsWith("remember ")) command.substringAfter("remember").trim() else command.substringAfter("save memory").trim()
                                         if (content.isNotBlank()) { dao.addMemory(MemoryEntity(title = "Voice memory", content = content)); refresh(); info = "Memory saved." }
                                     }
-                                    Regex("remind me in (\\\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).matches(command) -> {
-                                        val match = Regex("remind me in (\\\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).find(command)!!
+                                    Regex("remind me in (\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).matches(command) -> {
+                                        val match = Regex("remind me in (\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).find(command)!!
                                         val minutes = match.groupValues[1].toLong()
                                         val title = match.groupValues[3].trim()
                                         val at = System.currentTimeMillis() + minutes * 60_000L
