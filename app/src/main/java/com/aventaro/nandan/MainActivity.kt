@@ -48,6 +48,25 @@ private enum class Workspace(val label: String) {
     ASSISTANT("Overview"), TASKS("Tasks"), MEMORY("Memory"), REMINDERS("Reminders")
 }
 
+@Composable
+private fun NandanLaunchFlow(context: Context) {
+    var showSplash by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) { delay(1750); showSplash = false }
+    if (showSplash) NandanOmSplash() else NandanTabletApp(context)
+}
+
+@Composable
+private fun NandanOmSplash() {
+    val scale = remember { Animatable(4.2f) }
+    LaunchedEffect(Unit) { scale.animateTo(1f, animationSpec = tween(durationMillis = 1350)) }
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text("ॐ", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp))
+            Text("NANDAN", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NandanTabletApp(context: Context) {
