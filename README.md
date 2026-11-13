@@ -7,7 +7,7 @@ Nandan is being built as a desktop-first assistant that can chat with a locally 
 ## Current milestone: foundation
 
 - React + TypeScript + Vite user interface
-- FastAPI backend
+- FastAPI backend with local SQLite memory and task APIs
 - Ollama local model integration (no hosted AI API required)
 - Localhost-only backend binding by default
 - Clear extension points for memory, tasks, agents, and creator tools
@@ -35,6 +35,18 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 Backend health: http://127.0.0.1:8000/api/health
+
+## Local memory and tasks
+
+The API stores user-entered memories and tasks in a local SQLite database at `backend/data/nandan.db` by default. The database is created automatically when the API starts.
+
+- `GET/POST /api/memories` — list or save an explicitly entered memory
+- `DELETE /api/memories/{id}` — delete a memory
+- `GET/POST /api/tasks` — list or create tasks
+- `PATCH /api/tasks/{id}` — update task details or completion
+- `DELETE /api/tasks/{id}` — delete a task
+
+The frontend includes Tasks and Memory workspaces. These records are not automatically inferred from chat yet; users choose what to save.
 
 ## Run the frontend
 
