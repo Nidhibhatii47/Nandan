@@ -64,3 +64,39 @@ def test_invalid_memory_is_rejected(tmp_path, monkeypatch):
     client = setup_client(tmp_path, monkeypatch)
     response = client.post("/api/memories", json={"label": "", "content": ""})
     assert response.status_code == 422
+
+
+def test_memory_retrieval_matches_relevant_and_excludes_unrelated(tmp_path, monkeypatch):
+    setup_client(tmp_path, monkeypatch)
+    with main.connect_db() as db:
+        db.execute(
+            "INSERT INTO memories (id, label, content) VALUES (?, ?, ?)",
+            ("m1", "Work preference", "Use concise English for technical instructions."),
+        )
+        db.execute(
+            "INSERT INTO memories (id, label, content) VALUES (?, ?, ?)",
+            ("m2", "Food preference", "Vegetarian meals; avoid meat."),
+        )
+
+    selected = main.retrieve_relevant_memories("Help me write technical instructions in English")
+    assert [item["id"] for item in selected] == ["m1"]
+
+
+def test_chat_prompt_includes_only_relevant_saved_memory(tmp_path, monkeypatch):
+    setup_client(tmp_path, monkeypatch)
+    with main.connect_db() as db:
+        db.execute(
+            "INSERT INTO memories (id, label, content) VALUES (?, ?, ?)",
+            ("m1", "Writing preference", "Use concise English for technical instructions."),
+        )
+        db.execute(
+            "INSERT INTO memories (id, label, content) VALUES (?, ?, ?)",
+            ("m2", "Unrelated", "Vegetarian meal planning."),
+        )
+
+    request = main.ChatRequest(message="Explain technical instructions in English")
+    messages = main.build_chat_messages(request)
+    assert messages[0]["role"] == "system"
+    assert "Use concise English" in messages[0]["content"]
+    assert "Vegetarian meal planning" not in messages[0]["content"]
+    assert messages[-1] == {"role": "user", "content": request.message}
