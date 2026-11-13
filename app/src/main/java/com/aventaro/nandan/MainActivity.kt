@@ -58,6 +58,7 @@ private fun NandanLaunchFlow(context: Context) {
 
 @Composable
 private fun NandanOmSplash() {
+    MaterialTheme {
     val scale = remember { Animatable(4.2f) }
     LaunchedEffect(Unit) { scale.animateTo(1f, animationSpec = tween(durationMillis = 1350)) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -65,6 +66,7 @@ private fun NandanOmSplash() {
             Text("ॐ", style = MaterialTheme.typography.displayLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(12.dp).graphicsLayer { scaleX = scale.value; scaleY = scale.value })
             Text("NANDAN", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onBackground)
         }
+    }
     }
 }
 
@@ -145,7 +147,35 @@ private fun NandanTabletApp(context: Context) {
                             Text("Nandan", style = MaterialTheme.typography.headlineMedium)
                             Text("PERSONAL AI WORKSPACE  /  TABLET EDITION", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
                         }
-                        VoiceCommandButton(onCommand = { spoken ->\n                            scope.launch {\n                                val command = spoken.trim()\n                                val lower = command.lowercase()\n                                when {\n                                    lower.startsWith("add task ") || lower.startsWith("create task ") -> {\n                                        val title = command.substringAfter("task", "").trim()\n                                        if (title.isNotBlank()) { dao.addTask(TaskEntity(title = title)); refresh(); info = "Task added: $title" }\n                                    }\n                                    lower.startsWith("remember ") || lower.startsWith("save memory ") -> {\n                                        val content = if (lower.startsWith("remember ")) command.substringAfter("remember").trim() else command.substringAfter("save memory").trim()\n                                        if (content.isNotBlank()) { dao.addMemory(MemoryEntity(title = "Voice memory", content = content)); refresh(); info = "Memory saved." }\n                                    }\n                                    Regex("remind me in (\\\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).matches(command) -> {\n                                        val match = Regex("remind me in (\\\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).find(command)!!\n                                        val minutes = match.groupValues[1].toLong()\n                                        val title = match.groupValues[3].trim()\n                                        val at = System.currentTimeMillis() + minutes * 60_000L\n                                        val id = dao.addReminder(ReminderEntity(title = title, triggerAt = at))\n                                        scheduleReminder(context, id, title, "", at); refresh(); info = "Reminder set for $minutes minutes: $title"\n                                    }\n                                    lower.contains("open tasks") || lower.contains("show tasks") -> { selected = Workspace.TASKS; info = "Opening tasks." }\n                                    lower.contains("open memory") || lower.contains("show memories") -> { selected = Workspace.MEMORY; info = "Opening memory." }\n                                    lower.contains("open reminders") || lower.contains("show reminders") -> { selected = Workspace.REMINDERS; info = "Opening reminders." }\n                                    lower.contains("open overview") || lower.contains("go home") -> { selected = Workspace.ASSISTANT; info = "Opening overview." }\n                                    else -> info = "I heard: \\$command. Try: add task…, remember…, remind me in 5 minutes to…, or open tasks."\n                                }\n                            }\n                        }, onStatus = { info = it })
+                        VoiceCommandButton(onCommand = { spoken ->
+                            scope.launch {
+                                val command = spoken.trim()
+                                val lower = command.lowercase()
+                                when {
+                                    lower.startsWith("add task ") || lower.startsWith("create task ") -> {
+                                        val title = command.substringAfter("task", "").trim()
+                                        if (title.isNotBlank()) { dao.addTask(TaskEntity(title = title)); refresh(); info = "Task added: $title" }
+                                    }
+                                    lower.startsWith("remember ") || lower.startsWith("save memory ") -> {
+                                        val content = if (lower.startsWith("remember ")) command.substringAfter("remember").trim() else command.substringAfter("save memory").trim()
+                                        if (content.isNotBlank()) { dao.addMemory(MemoryEntity(title = "Voice memory", content = content)); refresh(); info = "Memory saved." }
+                                    }
+                                    Regex("remind me in (\\\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).matches(command) -> {
+                                        val match = Regex("remind me in (\\\\d+) minutes? (to )?(.+)", RegexOption.IGNORE_CASE).find(command)!!
+                                        val minutes = match.groupValues[1].toLong()
+                                        val title = match.groupValues[3].trim()
+                                        val at = System.currentTimeMillis() + minutes * 60_000L
+                                        val id = dao.addReminder(ReminderEntity(title = title, triggerAt = at))
+                                        scheduleReminder(context, id, title, "", at); refresh(); info = "Reminder set for $minutes minutes: $title"
+                                    }
+                                    lower.contains("open tasks") || lower.contains("show tasks") -> { selected = Workspace.TASKS; info = "Opening tasks." }
+                                    lower.contains("open memory") || lower.contains("show memories") -> { selected = Workspace.MEMORY; info = "Opening memory." }
+                                    lower.contains("open reminders") || lower.contains("show reminders") -> { selected = Workspace.REMINDERS; info = "Opening reminders." }
+                                    lower.contains("open overview") || lower.contains("go home") -> { selected = Workspace.ASSISTANT; info = "Opening overview." }
+                                    else -> info = "I heard: $command. Try: add task…, remember…, remind me in 5 minutes to…, or open tasks."
+                                }
+                            }
+                        }, onStatus = { info = it })
                     }
                     Text(info, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 14.dp, bottom = 18.dp))
                     when (selected) {
