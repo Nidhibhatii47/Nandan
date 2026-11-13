@@ -24,7 +24,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export default function App() {
   const [section, setSection] = useState<Section>("assistant");
   const [messages, setMessages] = useState<Message[]>([
-    { role: "assistant", content: "Welcome to Nandan. Your conversations use the local model when the desktop runtime is connected. Memory and tasks are stored locally on that computer." },
+    { role: "assistant", content: "Welcome to Nandan. Your conversations use the local model when the desktop runtime is connected. Explicitly saved memories are retrieved when relevant. Memory and tasks are stored locally on that computer." },
   ]);
   const [input, setInput] = useState("");
   const [health, setHealth] = useState<Health | null>(null);
@@ -152,6 +152,7 @@ export default function App() {
         {error && <div className="error-message" role="alert">{error}</div>}
 
         {section === "assistant" && <>
+          <div className="memory-status" role="note">◈ &nbsp; Relevant saved memories are added to chat context automatically. Only memories you explicitly save are used.</div>
           <section className="conversation" aria-live="polite">
             {messages.map((item, index) => <article className={"message " + item.role} key={index}>
               <div className="avatar">{item.role === "assistant" ? "N" : "Y"}</div>
@@ -183,7 +184,7 @@ export default function App() {
         </section>}
 
         {section === "memory" && <section className="workspace-content">
-          <p className="section-intro">Only save information you explicitly enter. You can review or delete every saved memory.</p>
+          <p className="section-intro">Only save information you explicitly enter. You can review or delete every saved memory. Matching memories are retrieved for relevant chat requests.</p>
           <form className="data-form" onSubmit={addMemory}>
             <input value={memoryLabel} onChange={(event) => setMemoryLabel(event.target.value)} placeholder="Memory title" maxLength={100} required />
             <textarea value={memoryContent} onChange={(event) => setMemoryContent(event.target.value)} placeholder="What should Nandan remember?" rows={3} maxLength={4000} required />
@@ -196,7 +197,7 @@ export default function App() {
             </article>)}</div>}
         </section>}
 
-        <p className="footer-note">Milestone 2 · Local SQLite storage · External actions are not enabled</p>
+        <p className="footer-note">Milestone 3 · Local memory retrieval · External actions are not enabled</p>
       </section>
     </main>
   );
