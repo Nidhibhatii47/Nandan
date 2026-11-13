@@ -96,52 +96,8 @@ private fun NandanTabletApp(context: Context) {
 
     MaterialTheme {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Row(Modifier.fillMaxSize()) {
-                NavigationRail(
-                    modifier = Modifier.fillMaxHeight(),
-                    containerColor = MaterialTheme.colorScheme.surface
-                ) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = MaterialTheme.shapes.large
-                        ) {
-                            Text("ॐ", modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                        }
-                        Text("NANDAN", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
-                    }
-                    NavigationRailItem(
-                        selected = selected == Workspace.ASSISTANT,
-                        onClick = { selected = Workspace.ASSISTANT },
-                        icon = { Icon(Icons.Filled.Home, contentDescription = null) },
-                        label = { Text("Overview") }
-                    )
-                    NavigationRailItem(
-                        selected = selected == Workspace.TASKS,
-                        onClick = { selected = Workspace.TASKS },
-                        icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null) },
-                        label = { Text("Tasks") }
-                    )
-                    NavigationRailItem(
-                        selected = selected == Workspace.MEMORY,
-                        onClick = { selected = Workspace.MEMORY },
-                        icon = { Icon(Icons.Filled.Star, contentDescription = null) },
-                        label = { Text("Memory") }
-                    )
-                    NavigationRailItem(
-                        selected = selected == Workspace.REMINDERS,
-                        onClick = { selected = Workspace.REMINDERS },
-                        icon = { Icon(Icons.Filled.Notifications, contentDescription = null) },
-                        label = { Text("Reminders") }
-                    )
-                    Spacer(Modifier.weight(1f))
-                    Text("LOCAL", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(bottom = 20.dp), color = MaterialTheme.colorScheme.secondary)
-                }
-                VerticalDivider()
-                Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 22.dp)) {
+            Column(Modifier.fillMaxSize()) {
+                Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 28.dp, vertical = 22.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("Nandan", style = MaterialTheme.typography.headlineMedium)
@@ -214,6 +170,35 @@ private fun NandanTabletApp(context: Context) {
                             { reminder -> cancelReminder(context, reminder.id); scope.launch { dao.deleteReminder(reminder.id); refresh() } }
                         )
                     }
+                }
+                NavigationBar(
+                    modifier = Modifier.fillMaxWidth(),
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
+                    NavigationBarItem(
+                        selected = selected == Workspace.ASSISTANT,
+                        onClick = { selected = Workspace.ASSISTANT },
+                        icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                        label = { Text("Overview") }
+                    )
+                    NavigationBarItem(
+                        selected = selected == Workspace.TASKS,
+                        onClick = { selected = Workspace.TASKS },
+                        icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null) },
+                        label = { Text("Tasks") }
+                    )
+                    NavigationBarItem(
+                        selected = selected == Workspace.MEMORY,
+                        onClick = { selected = Workspace.MEMORY },
+                        icon = { Icon(Icons.Filled.Star, contentDescription = null) },
+                        label = { Text("Memory") }
+                    )
+                    NavigationBarItem(
+                        selected = selected == Workspace.REMINDERS,
+                        onClick = { selected = Workspace.REMINDERS },
+                        icon = { Icon(Icons.Filled.Notifications, contentDescription = null) },
+                        label = { Text("Reminders") }
+                    )
                 }
             }
         }
