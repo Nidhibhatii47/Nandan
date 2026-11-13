@@ -52,3 +52,35 @@ button, textarea { font: inherit; }
   .topbar { align-items: flex-start; flex-direction: column; }
   .composer-footer { align-items: flex-end; }
 }
+
+
+/* Memory and task workspace */
+.nav-item { width: 100%; border: 0; background: transparent; text-align: left; cursor: pointer; font: inherit; }
+.nav-item.active { background: #20283b; }
+.workspace-content { flex: 1; padding: 30px 0; max-width: 780px; width: 100%; }
+.section-intro { color: #9ba6ba; font-size: 13px; line-height: 1.6; margin: 0 0 20px; }
+.data-form { display: grid; gap: 10px; padding: 16px; border: 1px solid #343d50; border-radius: 13px; background: rgba(22,27,39,.8); }
+.data-form input, .data-form textarea { width: 100%; border: 1px solid #343d50; border-radius: 8px; padding: 11px 12px; color: #edf0f7; background: #111722; outline: none; font: inherit; font-size: 12px; }
+.data-form input:focus, .data-form textarea:focus { border-color: #8499e8; }
+.data-form textarea { resize: vertical; }
+.data-form button { justify-self: start; border: 0; border-radius: 8px; padding: 10px 15px; color: #121827; background: #aabaff; font-size: 11px; font-weight: 700; cursor: pointer; }
+.data-form button:disabled { opacity: .45; cursor: not-allowed; }
+.empty-state { color: #7d899f; font-size: 12px; padding: 25px 5px; }
+.item-list { display: grid; gap: 9px; margin-top: 18px; }
+.data-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px; border: 1px solid #293244; border-radius: 10px; background: rgba(22,27,39,.65); }
+.data-item strong { display: block; color: #e5e9f2; font-size: 13px; }
+.data-item small { display: block; margin-top: 5px; color: #8290a8; font-size: 10px; }
+.data-item.done strong { color: #83918f; text-decoration: line-through; }
+.task-check { display: flex; align-items: flex-start; gap: 11px; min-width: 0; flex: 1; cursor: pointer; }
+.task-check input { margin-top: 2px; accent-color: #aabaff; }
+.task-check span { min-width: 0; }
+.task-check small { display: block; color: #8995aa; margin-top: 4px; font-size: 11px; }
+.delete-button { flex-shrink: 0; color: #d59a9a; background: transparent; border: 1px solid #594047; border-radius: 7px; padding: 7px 10px; font-size: 10px; cursor: pointer; }
+.memory-item { align-items: flex-start; }
+.memory-item > div { min-width: 0; flex: 1; }
+.memory-item p { margin: 7px 0 0; color: #b9c3d4; font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  .sidebar .nav-item { display: block; width: 44px; height: 42px; overflow: hidden; white-space: nowrap; padding: 12px 10px; font-size: 0; }
+  .sidebar .nav-item small { display: none; }
+  .workspace-content { padding-top: 22px; }
+}
