@@ -4,7 +4,7 @@ on:
   push:
     branches: ["feature/android-native-app"]
   pull_request:
-    branches: ["main", "feature/android-native-app"]
+    branches: ["main", "feature/**"]
   workflow_dispatch:
 
 jobs:
