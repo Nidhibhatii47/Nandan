@@ -103,7 +103,7 @@ private fun NandanApp(context: Context) {
                     Workspace.REMINDERS -> {
                         OutlinedTextField(reminderTitle, { reminderTitle = it }, label = { Text("Reminder title") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(reminderNote, { reminderNote = it }, label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(reminderMinutes, { reminderMinutes = it.filter(Char::isDigit).take(5) }, label = { Text("Minutes from now") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(reminderMinutes, { reminderMinutes = it.filter { char -> char.isDigit() }.take(5) }, label = { Text("Minutes from now") }, modifier = Modifier.fillMaxWidth())
                         Button(onClick = {
                             val minutes = reminderMinutes.toLongOrNull()
                             if (reminderTitle.isNotBlank() && minutes != null && minutes > 0) scope.launch {
@@ -124,8 +124,8 @@ private fun NandanApp(context: Context) {
                                         Text(DateFormat.getDateTimeInstance().format(Date(reminder.triggerAt)))
                                         Text(if (reminder.acknowledged) "Acknowledged" else "Scheduled")
                                         Row {
-                                            if (!reminder.acknowledged) TextButton(onClick = { scope.launch { dao.acknowledgeReminder(reminder.id); refresh() } }) { Text("Done") }
-                                            TextButton(onClick = { scope.launch { dao.deleteReminder(reminder.id); refresh() } }) { Text("Delete") }
+                                            if (!reminder.acknowledged) TextButton(onClick = { cancelReminder(context, reminder.id); scope.launch { dao.acknowledgeReminder(reminder.id); refresh() } }) { Text("Done") }
+                                            TextButton(onClick = { cancelReminder(context, reminder.id); scope.launch { dao.deleteReminder(reminder.id); refresh() } }) { Text("Delete") }
                                         }
                                     }
                                 }
@@ -164,4 +164,15 @@ private fun scheduleReminder(context: Context, id: Long, title: String, note: St
     } else {
         alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAt, pending)
     }
+}
+
+private fun cancelReminder(context: Context, id: Long) {
+    val intent = Intent(context, ReminderReceiver::class.java)
+    val pending = PendingIntent.getBroadcast(
+        context, id.toInt(), intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
+    val alarms = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    alarms.cancel(pending)
+    pending.cancel()
 }
