@@ -14,8 +14,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -30,15 +36,17 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        setContent { NandanApp(this) }
+        setContent { NandanTabletApp(this) }
     }
 }
 
-private enum class Workspace(val label: String) { ASSISTANT("Assistant"), TASKS("Tasks"), MEMORY("Memory"), REMINDERS("Reminders") }
+private enum class Workspace(val label: String) {
+    ASSISTANT("Overview"), TASKS("Tasks"), MEMORY("Memory"), REMINDERS("Reminders")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NandanApp(context: Context) {
+private fun NandanTabletApp(context: Context) {
     val dao = remember { NandanDatabase.get(context).dao() }
     val scope = rememberCoroutineScope()
     var selected by remember { mutableStateOf(Workspace.ASSISTANT) }
@@ -51,7 +59,7 @@ private fun NandanApp(context: Context) {
     var reminderTitle by remember { mutableStateOf("") }
     var reminderNote by remember { mutableStateOf("") }
     var reminderMinutes by remember { mutableStateOf("5") }
-    var info by remember { mutableStateOf("Your private workspace is stored on this device.") }
+    var info by remember { mutableStateOf("All information is stored locally on this tablet.") }
 
     suspend fun refresh() {
         tasks = dao.tasks()
@@ -61,75 +69,156 @@ private fun NandanApp(context: Context) {
     LaunchedEffect(selected) { refresh() }
 
     MaterialTheme {
-        Scaffold(topBar = { TopAppBar(title = { Column { Text("Nandan"); Text("PERSONAL AI OS", style = MaterialTheme.typography.labelSmall) } }) }) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
-                ScrollableTabRow(selectedTabIndex = selected.ordinal) {
-                    Workspace.entries.forEach { item -> Tab(selected == item, { selected = item }, text = { Text(item.label) }) }
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Row(Modifier.fillMaxSize()) {
+                NavigationRail(
+                    modifier = Modifier.fillMaxHeight(),
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = MaterialTheme.shapes.large
+                        ) {
+                            Text("N", modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        }
+                        Text("NANDAN", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    NavigationRailItem(
+                        selected = selected == Workspace.ASSISTANT,
+                        onClick = { selected = Workspace.ASSISTANT },
+                        icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                        label = { Text("Overview") }
+                    )
+                    NavigationRailItem(
+                        selected = selected == Workspace.TASKS,
+                        onClick = { selected = Workspace.TASKS },
+                        icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null) },
+                        label = { Text("Tasks") }
+                    )
+                    NavigationRailItem(
+                        selected = selected == Workspace.MEMORY,
+                        onClick = { selected = Workspace.MEMORY },
+                        icon = { Icon(Icons.Filled.Star, contentDescription = null) },
+                        label = { Text("Memory") }
+                    )
+                    NavigationRailItem(
+                        selected = selected == Workspace.REMINDERS,
+                        onClick = { selected = Workspace.REMINDERS },
+                        icon = { Icon(Icons.Filled.Notifications, contentDescription = null) },
+                        label = { Text("Reminders") }
+                    )
+                    Spacer(Modifier.weight(1f))
+                    Text("LOCAL", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(bottom = 20.dp), color = MaterialTheme.colorScheme.secondary)
                 }
-                Text(info, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(vertical = 10.dp))
-                when (selected) {
-                    Workspace.ASSISTANT -> AssistantWorkspace()
-                    Workspace.TASKS -> {
-                        OutlinedTextField(taskTitle, { taskTitle = it }, label = { Text("New task") }, modifier = Modifier.fillMaxWidth())
-                        Button(onClick = { if (taskTitle.isNotBlank()) scope.launch { dao.addTask(TaskEntity(title = taskTitle.trim())); taskTitle = ""; refresh() } }, modifier = Modifier.padding(top = 8.dp)) { Text("Add task") }
-                        LazyColumn(Modifier.weight(1f)) {
-                            items(tasks, key = { it.id }) { task ->
-                                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Row(Modifier.weight(1f)) {
-                                        Checkbox(task.completed, { checked -> scope.launch { dao.setTaskCompleted(task.id, checked); refresh() } })
-                                        Text(task.title, modifier = Modifier.padding(top = 12.dp))
-                                    }
-                                    TextButton(onClick = { scope.launch { dao.deleteTask(task.id); refresh() } }) { Text("Delete") }
-                                }
-                            }
+                VerticalDivider()
+                Column(Modifier.weight(1f).fillMaxHeight().padding(horizontal = 28.dp, vertical = 22.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("Nandan", style = MaterialTheme.typography.headlineMedium)
+                            Text("PERSONAL AI WORKSPACE  /  TABLET EDITION", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
                         }
+                        AssistChip(onClick = {}, label = { Text("On-device workspace") })
                     }
-                    Workspace.MEMORY -> {
-                        OutlinedTextField(memoryTitle, { memoryTitle = it }, label = { Text("Memory title") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(memoryContent, { memoryContent = it }, label = { Text("What should Nandan remember?") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
-                        Button(onClick = { if (memoryTitle.isNotBlank() && memoryContent.isNotBlank()) scope.launch { dao.addMemory(MemoryEntity(title = memoryTitle.trim(), content = memoryContent.trim())); memoryTitle = ""; memoryContent = ""; refresh() } }, modifier = Modifier.padding(top = 8.dp)) { Text("Save memory") }
-                        LazyColumn(Modifier.weight(1f)) {
-                            items(memories, key = { it.id }) { memory ->
-                                ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-                                    Column(Modifier.padding(12.dp)) {
-                                        Text(memory.title, style = MaterialTheme.typography.titleMedium)
-                                        Text(memory.content)
-                                        TextButton(onClick = { scope.launch { dao.deleteMemory(memory.id); refresh() } }) { Text("Delete") }
-                                    }
-                                }
+                    Text(info, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 14.dp, bottom = 18.dp))
+                    when (selected) {
+                        Workspace.ASSISTANT -> OverviewWorkspace(tasks.size, memories.size, reminders.count { !it.acknowledged })
+                        Workspace.TASKS -> TasksWorkspace(tasks, taskTitle, { taskTitle = it }, {
+                            if (taskTitle.isNotBlank()) scope.launch {
+                                dao.addTask(TaskEntity(title = taskTitle.trim()))
+                                taskTitle = ""
+                                refresh()
                             }
-                        }
+                        }, { task, checked -> scope.launch { dao.setTaskCompleted(task.id, checked); refresh() } }, { task ->
+                            scope.launch { dao.deleteTask(task.id); refresh() }
+                        })
+                        Workspace.MEMORY -> MemoryWorkspace(memories, memoryTitle, { memoryTitle = it }, memoryContent, { memoryContent = it }, {
+                            if (memoryTitle.isNotBlank() && memoryContent.isNotBlank()) scope.launch {
+                                dao.addMemory(MemoryEntity(title = memoryTitle.trim(), content = memoryContent.trim()))
+                                memoryTitle = ""; memoryContent = ""; refresh()
+                            }
+                        }, { memory -> scope.launch { dao.deleteMemory(memory.id); refresh() } })
+                        Workspace.REMINDERS -> RemindersWorkspace(
+                            reminders, reminderTitle, { reminderTitle = it }, reminderNote, { reminderNote = it },
+                            reminderMinutes, { reminderMinutes = it.filter(Char::isDigit).take(5) },
+                            {
+                                val minutes = reminderMinutes.toLongOrNull()
+                                if (reminderTitle.isNotBlank() && minutes != null && minutes > 0) scope.launch {
+                                    val triggerAt = System.currentTimeMillis() + minutes * 60_000L
+                                    val title = reminderTitle.trim()
+                                    val note = reminderNote.trim()
+                                    val id = dao.addReminder(ReminderEntity(title = title, note = note, triggerAt = triggerAt))
+                                    scheduleReminder(context, id, title, note, triggerAt)
+                                    reminderTitle = ""; reminderNote = ""; refresh()
+                                    info = "Reminder scheduled on this tablet."
+                                }
+                            },
+                            { reminder -> cancelReminder(context, reminder.id); scope.launch { dao.acknowledgeReminder(reminder.id); refresh() } },
+                            { reminder -> cancelReminder(context, reminder.id); scope.launch { dao.deleteReminder(reminder.id); refresh() } }
+                        )
                     }
-                    Workspace.REMINDERS -> {
-                        OutlinedTextField(reminderTitle, { reminderTitle = it }, label = { Text("Reminder title") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(reminderNote, { reminderNote = it }, label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(reminderMinutes, { reminderMinutes = it.filter { char -> char.isDigit() }.take(5) }, label = { Text("Minutes from now") }, modifier = Modifier.fillMaxWidth())
-                        Button(onClick = {
-                            val minutes = reminderMinutes.toLongOrNull()
-                            if (reminderTitle.isNotBlank() && minutes != null && minutes > 0) scope.launch {
-                                val triggerAt = System.currentTimeMillis() + minutes * 60_000L
-                                val title = reminderTitle.trim()
-                                val note = reminderNote.trim()
-                                val id = dao.addReminder(ReminderEntity(title = title, note = note, triggerAt = triggerAt))
-                                scheduleReminder(context, id, title, note, triggerAt)
-                                reminderTitle = ""; reminderNote = ""; refresh()
-                                info = "Reminder scheduled on this device."
-                            }
-                        }, modifier = Modifier.padding(top = 8.dp)) { Text("Schedule reminder") }
-                        LazyColumn(Modifier.weight(1f)) {
-                            items(reminders, key = { it.id }) { reminder ->
-                                ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
-                                    Column(Modifier.padding(12.dp)) {
-                                        Text(reminder.title, style = MaterialTheme.typography.titleMedium)
-                                        Text(DateFormat.getDateTimeInstance().format(Date(reminder.triggerAt)))
-                                        Text(if (reminder.acknowledged) "Acknowledged" else "Scheduled")
-                                        Row {
-                                            if (!reminder.acknowledged) TextButton(onClick = { cancelReminder(context, reminder.id); scope.launch { dao.acknowledgeReminder(reminder.id); refresh() } }) { Text("Done") }
-                                            TextButton(onClick = { cancelReminder(context, reminder.id); scope.launch { dao.deleteReminder(reminder.id); refresh() } }) { Text("Delete") }
-                                        }
-                                    }
-                                }
-                            }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OverviewWorkspace(taskCount: Int, memoryCount: Int, reminderCount: Int) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Text("Your command centre", style = MaterialTheme.typography.titleLarge)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            MetricCard("Open tasks", taskCount.toString(), Modifier.weight(1f))
+            MetricCard("Saved memories", memoryCount.toString(), Modifier.weight(1f))
+            MetricCard("Active reminders", reminderCount.toString(), Modifier.weight(1f))
+        }
+        ElevatedCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Local AI engine", style = MaterialTheme.typography.titleLarge)
+                Text("The Android app foundation is ready. The on-device model runtime is the next engineering component and has not been connected yet.")
+                Text("No cloud AI service is silently substituted.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            }
+        }
+        Text("Use the navigation rail to manage tasks, memories and reminders.", style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun MetricCard(label: String, value: String, modifier: Modifier = Modifier) {
+    ElevatedCard(modifier) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(value, style = MaterialTheme.typography.headlineLarge)
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun TasksWorkspace(
+    tasks: List<TaskEntity>, title: String, onTitle: (String) -> Unit, onAdd: () -> Unit,
+    onToggle: (TaskEntity, Boolean) -> Unit, onDelete: (TaskEntity) -> Unit
+) {
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        ElevatedCard(Modifier.width(300.dp)) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Create a task", style = MaterialTheme.typography.titleLarge)
+                OutlinedTextField(title, onTitle, label = { Text("Task title") }, modifier = Modifier.fillMaxWidth())
+                Button(onClick = onAdd, modifier = Modifier.fillMaxWidth(), enabled = title.isNotBlank()) { Text("Add task") }
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text("Your task list", style = MaterialTheme.typography.titleLarge)
+            if (tasks.isEmpty()) Text("No tasks yet. Add your first task.", modifier = Modifier.padding(top = 16.dp))
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(tasks, key = { it.id }) { task ->
+                    ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(task.completed, { onToggle(task, it) })
+                            Text(task.title, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onDelete(task) }) { Text("Delete") }
                         }
                     }
                 }
@@ -139,15 +228,77 @@ private fun NandanApp(context: Context) {
 }
 
 @Composable
-private fun AssistantWorkspace() {
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Nandan Android foundation", style = MaterialTheme.typography.headlineSmall)
-        Text("Your tasks, memories and reminders are saved locally on this device.")
-        ElevatedCard { Column(Modifier.padding(16.dp)) {
-            Text("Local AI runtime", style = MaterialTheme.typography.titleMedium)
-            Text("Not connected yet. The on-device model runtime will be added and benchmarked separately. No cloud AI service is silently substituted.")
-        } }
-        Text("Next: device pairing, local model integration and approved automation.")
+private fun MemoryWorkspace(
+    memories: List<MemoryEntity>, title: String, onTitle: (String) -> Unit,
+    content: String, onContent: (String) -> Unit, onSave: () -> Unit, onDelete: (MemoryEntity) -> Unit
+) {
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        ElevatedCard(Modifier.width(340.dp)) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Save a memory", style = MaterialTheme.typography.titleLarge)
+                OutlinedTextField(title, onTitle, label = { Text("Title") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(content, onContent, label = { Text("Memory details") }, modifier = Modifier.fillMaxWidth(), minLines = 4)
+                Button(onClick = onSave, modifier = Modifier.fillMaxWidth(), enabled = title.isNotBlank() && content.isNotBlank()) { Text("Save memory") }
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text("Saved memories", style = MaterialTheme.typography.titleLarge)
+            if (memories.isEmpty()) Text("Your saved information will appear here.", modifier = Modifier.padding(top = 16.dp))
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(memories, key = { it.id }) { memory ->
+                    ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                        Column(Modifier.padding(16.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(memory.title, style = MaterialTheme.typography.titleMedium)
+                                TextButton(onClick = { onDelete(memory) }) { Text("Delete") }
+                            }
+                            Text(memory.content)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemindersWorkspace(
+    reminders: List<ReminderEntity>, title: String, onTitle: (String) -> Unit,
+    note: String, onNote: (String) -> Unit, minutes: String, onMinutes: (String) -> Unit,
+    onSchedule: () -> Unit, onDone: (ReminderEntity) -> Unit, onDelete: (ReminderEntity) -> Unit
+) {
+    Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        ElevatedCard(Modifier.width(340.dp)) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Schedule a reminder", style = MaterialTheme.typography.titleLarge)
+                OutlinedTextField(title, onTitle, label = { Text("Reminder title") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(note, onNote, label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2)
+                OutlinedTextField(minutes, onMinutes, label = { Text("Minutes from now") }, modifier = Modifier.fillMaxWidth())
+                Button(onClick = onSchedule, modifier = Modifier.fillMaxWidth(), enabled = title.isNotBlank() && (minutes.toLongOrNull() ?: 0L) > 0) { Text("Schedule reminder") }
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text("Your reminders", style = MaterialTheme.typography.titleLarge)
+            if (reminders.isEmpty()) Text("No reminders scheduled.", modifier = Modifier.padding(top = 16.dp))
+            LazyColumn(Modifier.fillMaxSize()) {
+                items(reminders, key = { it.id }) { reminder ->
+                    ElevatedCard(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {
+                        Column(Modifier.padding(16.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text(reminder.title, style = MaterialTheme.typography.titleMedium)
+                                Text(if (reminder.acknowledged) "Completed" else "Scheduled", color = MaterialTheme.colorScheme.secondary)
+                            }
+                            Text(DateFormat.getDateTimeInstance().format(Date(reminder.triggerAt)))
+                            if (reminder.note.isNotBlank()) Text(reminder.note)
+                            Row {
+                                if (!reminder.acknowledged) TextButton(onClick = { onDone(reminder) }) { Text("Done") }
+                                TextButton(onClick = { onDelete(reminder) }) { Text("Delete") }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -168,10 +319,7 @@ private fun scheduleReminder(context: Context, id: Long, title: String, note: St
 
 private fun cancelReminder(context: Context, id: Long) {
     val intent = Intent(context, ReminderReceiver::class.java)
-    val pending = PendingIntent.getBroadcast(
-        context, id.toInt(), intent,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
+    val pending = PendingIntent.getBroadcast(context, id.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     val alarms = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     alarms.cancel(pending)
     pending.cancel()
