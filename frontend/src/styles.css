@@ -84,3 +84,14 @@ button, textarea { font: inherit; }
   .sidebar .nav-item small { display: none; }
   .workspace-content { padding-top: 22px; }
 }
+
+
+.memory-status {
+  margin: 18px 28px 0;
+  padding: 10px 13px;
+  border: 1px solid var(--border, #e4e7ec);
+  border-radius: 10px;
+  color: var(--muted, #667085);
+  font-size: 12px;
+  background: var(--surface, #fff);
+}
